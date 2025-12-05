@@ -1,17 +1,40 @@
-const { app, BrowserWindow } = require("electron");
+const { app, BrowserWindow, ipcMain } = require("electron");
 const path = require("path");
-const { ipcMain } = require("electron");
+const fs = require("fs");
 const puppeteer = require("puppeteer");
 const { autoUpdater } = require("electron-updater");
 
-const isDev = !app.isPackaged; 
+const isDev = !app.isPackaged;
 
-let mainWindow; // 👈 guarda a janela
+let mainWindow;
+let splashWindow;
 
+/**
+ * Janela de splash / loading
+ */
+function createSplashWindow() {
+  splashWindow = new BrowserWindow({
+    width: 400,
+    height: 300,
+    frame: false,          // sem borda
+    transparent: false,    // pode deixar true se quiser
+    alwaysOnTop: true,
+    resizable: false,
+    movable: true,
+    show: true,
+  });
+
+  splashWindow.loadFile(path.join(__dirname, "splash.html"));
+}
+
+/**
+ * Janela principal
+ */
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1000,
     height: 700,
+    show: false, // começa escondida
     webPreferences: {
       contextIsolation: true,
       preload: path.join(__dirname, "preload.js"),
@@ -22,10 +45,28 @@ function createWindow() {
     mainWindow.loadURL("http://localhost:5173");
     mainWindow.webContents.openDevTools();
   } else {
-    mainWindow.loadFile(path.join(__dirname, "..", "frontend", "dist", "index.html"));
+    mainWindow.loadFile(
+      path.join(__dirname, "..", "frontend", "dist", "index.html")
+    );
   }
+
+  // Quando estiver pronto para exibir
+  mainWindow.once("ready-to-show", () => {
+    if (splashWindow) {
+      splashWindow.close();
+      splashWindow = null;
+    }
+    mainWindow.show();
+  });
+
+  mainWindow.on("closed", () => {
+    mainWindow = null;
+  });
 }
 
+/**
+ * Enviar status de update para o renderer
+ */
 function sendStatus(text) {
   console.log("[AUTO-UPDATER]", text);
   if (mainWindow) {
@@ -33,6 +74,9 @@ function sendStatus(text) {
   }
 }
 
+/**
+ * Configuração do AutoUpdater
+ */
 function setupAutoUpdater() {
   if (!app.isPackaged) {
     sendStatus("AutoUpdater desativado em modo dev.");
@@ -57,7 +101,11 @@ function setupAutoUpdater() {
   });
 
   autoUpdater.on("error", (err) => {
-    sendStatus(`Erro no autoUpdater: ${err == null ? "desconhecido" : err.message}`);
+    sendStatus(
+      `Erro no autoUpdater: ${
+        err == null ? "desconhecido" : err.message || String(err)
+      }`
+    );
   });
 
   autoUpdater.on("download-progress", (progress) => {
@@ -65,23 +113,30 @@ function setupAutoUpdater() {
   });
 
   autoUpdater.on("update-downloaded", (info) => {
-    sendStatus(`Update ${info.version} baixado. Será instalado ao fechar o app.`);
+    sendStatus(
+      `Update ${info.version} baixado. Será instalado ao fechar o app.`
+    );
   });
 
   autoUpdater.checkForUpdatesAndNotify();
 }
 
-
+/**
+ * Ciclo de vida do app
+ */
 app.whenReady().then(() => {
+  createSplashWindow();
   createWindow();
   setupAutoUpdater();
 
   app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createSplashWindow();
+      createWindow();
+      // Não precisa chamar setupAutoUpdater de novo
+    }
   });
 });
-
-
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
@@ -89,58 +144,61 @@ app.on("window-all-closed", () => {
   }
 });
 
-
-
-// IPC handler para rodar o Puppeteer
-
-ipcMain.handle("run-puppeteer", async (event, urlSite) => {
+/**
+ * IPC handler para rodar o Puppeteer
+ */
+ipcMain.handle("run-puppeteer", async (_event, urlSite) => {
   try {
     const isProd = app.isPackaged;
 
-    const executablePath = puppeteer
+    // Corrige caminho do chrome quando empacotado
+    const executablePathPatched = puppeteer
       .executablePath()
       .replace("app.asar", "app.asar.unpacked");
 
     const browser = await puppeteer.launch({
-      headless: false,
-      executablePath: isProd ? executablePath : puppeteer.executablePath(),
+      headless: true,
+      executablePath: isProd ? executablePathPatched : puppeteer.executablePath(),
       args: ["--no-sandbox", "--disable-setuid-sandbox"],
     });
 
     const page = await browser.newPage();
-
     const url = urlSite;
+
     await page.goto(url, {
       waitUntil: "networkidle2",
     });
 
     const title = await page.title();
-    console.log("Título:", title);
+    console.log("Título da página:", title);
 
-    let pdfPath;
-    if (isProd) {
-      const baseFolder = path.join(app.getPath("documents"), "MeuApp");
-      pdfPath = path.join(baseFolder, `${url.replace("https://", "")}.pdf`);
-    } else {
-      pdfPath = `files/${url.replace("https://", "")}.pdf`;
-    }
+    // Monta pasta base e nome do arquivo seguro
+    const safeName = url
+      .replace(/^https?:\/\//, "")
+      .replace(/[^a-z0-9]/gi, "_");
+
+    const baseFolder = isProd
+      ? path.join(app.getPath("documents"), "MeuApp")
+      : path.join(__dirname, "..", "files");
 
     if (!fs.existsSync(baseFolder)) {
       fs.mkdirSync(baseFolder, { recursive: true });
     }
 
+    const pdfPath = path.join(baseFolder, `${safeName}.pdf`);
+
     await page.pdf({
       path: pdfPath,
       printBackground: true,
-      format: "A4", // ou "Letter"
-      landscape: true, // vira horizontal se quiser
+      format: "A4",
+      landscape: true,
     });
 
     await browser.close();
 
-    return true;
+    return { success: true, pdfPath };
   } catch (err) {
     console.error("Puppeteer erro:", err);
-    return false;
+    return { success: false, error: err.message || String(err) };
   }
 });
