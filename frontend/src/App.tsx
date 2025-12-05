@@ -1,9 +1,9 @@
-
-import './App.css'
-import { useState } from 'react';
+import { useEffect, useState } from "react";
+import "./App.css";
 
 function App() {
-  const [url, setUrl] = useState(''); 
+  const [url, setUrl] = useState("");
+  const [updateStatus, setUpdateStatus] = useState<string>("(sem status)");
 
   const handleRun = async () => {
     console.log("Chamando Puppeteer...");
@@ -12,10 +12,22 @@ function App() {
     console.log("Resultado:", result);
   };
 
+  useEffect(() => {
+    if (window.api?.onUpdateStatus) {
+      window.api.onUpdateStatus((msg: string) => {
+        console.log("Update status:", msg);
+        setUpdateStatus(msg);
+      });
+    }
+  }, []);
 
   return (
     <div style={{ padding: 30 }}>
       <h1>App Vite + Electron + Puppeteer</h1>
+
+      <div style={{ marginBottom: 20 }}>
+        <strong>Status de update:</strong> {updateStatus}
+      </div>
 
       <button
         onClick={handleRun}
@@ -24,6 +36,11 @@ function App() {
           padding: "10px 20px",
           fontSize: "16px",
           cursor: "pointer",
+          backgroundColor: "#4CAF50",
+          marginRight: "10px",
+          color: "white",
+          border: "none",
+          borderRadius: "5px",
         }}
       >
         Rodar Puppeteer
@@ -38,7 +55,4 @@ function App() {
   );
 }
 
-
-
-
-export default App
+export default App;

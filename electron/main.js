@@ -1,47 +1,83 @@
-
 const { app, BrowserWindow } = require("electron");
 const path = require("path");
 const { ipcMain } = require("electron");
 const puppeteer = require("puppeteer");
+const { autoUpdater } = require("electron-updater");
 
+const isDev = !app.isPackaged; 
 
-
+let mainWindow; // 👈 guarda a janela
 
 function createWindow() {
-  const win = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1000,
     height: 700,
     webPreferences: {
-      // por enquanto deixamos bem simples
       contextIsolation: true,
-      nodeIntegration: false,
-    preload: path.join(__dirname, "preload.js"),
+      preload: path.join(__dirname, "preload.js"),
     },
   });
 
-
-  const startUrl = process.env.ELECTRON_START_URL;
-
-  if (startUrl) {
-    win.loadURL(startUrl);
-    win.webContents.openDevTools();
+  if (isDev) {
+    mainWindow.loadURL("http://localhost:5173");
+    mainWindow.webContents.openDevTools();
   } else {
-    // fallback pra build (a gente arruma isso depois)
-    win.loadFile(path.join(__dirname, "../frontend/dist/index.html"));
+    mainWindow.loadFile(path.join(__dirname, "..", "frontend", "dist", "index.html"));
   }
 }
 
+function sendStatus(text) {
+  console.log("[AUTO-UPDATER]", text);
+  if (mainWindow) {
+    mainWindow.webContents.send("update-status", text);
+  }
+}
+
+function setupAutoUpdater() {
+  if (!app.isPackaged) {
+    sendStatus("AutoUpdater desativado em modo dev.");
+    return;
+  }
+
+  sendStatus("Configurando AutoUpdater...");
+
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on("checking-for-update", () => {
+    sendStatus("Verificando atualizações...");
+  });
+
+  autoUpdater.on("update-available", (info) => {
+    sendStatus(`Atualização disponível: versão ${info.version}`);
+  });
+
+  autoUpdater.on("update-not-available", () => {
+    sendStatus("Nenhuma atualização disponível.");
+  });
+
+  autoUpdater.on("error", (err) => {
+    sendStatus(`Erro no autoUpdater: ${err == null ? "desconhecido" : err.message}`);
+  });
+
+  autoUpdater.on("download-progress", (progress) => {
+    sendStatus(`Baixando update: ${Math.round(progress.percent)}%`);
+  });
+
+  autoUpdater.on("update-downloaded", (info) => {
+    sendStatus(`Update ${info.version} baixado. Será instalado ao fechar o app.`);
+  });
+
+  autoUpdater.checkForUpdatesAndNotify();
+}
 
 
-  app.whenReady().then(() => {
+app.whenReady().then(() => {
   createWindow();
-
-
+  setupAutoUpdater();
 
   app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
-    }
+    if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
 });
 
@@ -57,10 +93,7 @@ app.on("window-all-closed", () => {
 
 // IPC handler para rodar o Puppeteer
 
-ipcMain.handle("run-puppeteer", async (event,urlSite) => {
-  
-
-
+ipcMain.handle("run-puppeteer", async (event, urlSite) => {
   try {
     const isProd = app.isPackaged;
 
@@ -92,25 +125,22 @@ ipcMain.handle("run-puppeteer", async (event,urlSite) => {
       pdfPath = `files/${url.replace("https://", "")}.pdf`;
     }
 
-      if (!fs.existsSync(baseFolder)) {
-        fs.mkdirSync(baseFolder, { recursive: true });
-      }
+    if (!fs.existsSync(baseFolder)) {
+      fs.mkdirSync(baseFolder, { recursive: true });
+    }
 
-   await page.pdf({
-     path:pdfPath,
-     printBackground: true,
-     format: "A4", // ou "Letter"
-     landscape: true, // vira horizontal se quiser
-   });
+    await page.pdf({
+      path: pdfPath,
+      printBackground: true,
+      format: "A4", // ou "Letter"
+      landscape: true, // vira horizontal se quiser
+    });
 
     await browser.close();
 
     return true;
-
   } catch (err) {
     console.error("Puppeteer erro:", err);
     return false;
   }
 });
-
-
