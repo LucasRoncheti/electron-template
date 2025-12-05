@@ -1,0 +1,94 @@
+# ----------------------------
+# Node
+# ----------------------------
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ----------------------------
+# Vite + Frontend build
+# ----------------------------
+frontend/dist/
+frontend/node_modules/
+frontend/.vite/
+
+# ----------------------------
+# Electron build outputs
+# ----------------------------
+dist/
+release/
+out/
+
+# electron-builder cache
+# (evita subir 500MB no repo!)
+.electron-builder/
+builder-debug.yml
+builder-effective-config.yaml
+
+# ----------------------------
+# Puppeteer
+# ----------------------------
+# Chromium baixado automaticamente
+.puppeteer/
+
+# ----------------------------
+# Logs
+# ----------------------------
+*.log
+*.pid
+*.seed
+*.pid.lock
+
+# ----------------------------
+# Sistema Operacional
+# ----------------------------
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.cache/
+
+# ----------------------------
+# IDE / Editor
+# ----------------------------
+.vscode/
+.vscode-test/
+.idea/
+*.swp
+*.swo
+
+# ----------------------------
+# Files gerados pelo seu app
+# ----------------------------
+files/
+*.pdf
+
+# ----------------------------
+# Environment variables
+# ----------------------------
+.env
+.env.local
+.env.*.local
+
+# OneDrive metadados (já que seu projeto está na OneDrive)
+*.tmp
+~$*
+
+# ----------------------------
+# Build temporário ou conteúdo de produção
+# ----------------------------
+*.asar
+*.asar.unpacked
+
