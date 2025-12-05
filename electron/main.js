@@ -3,11 +3,13 @@ const path = require("path");
 const fs = require("fs");
 const puppeteer = require("puppeteer");
 const { autoUpdater } = require("electron-updater");
+const { dialog } = require("electron");
 
 const isDev = !app.isPackaged;
 
 let mainWindow;
 let splashWindow;
+
 
 /**
  * Janela de splash / loading
@@ -86,7 +88,7 @@ function setupAutoUpdater() {
   sendStatus("Configurando AutoUpdater...");
 
   autoUpdater.autoDownload = true;
-  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.autoInstallOnAppQuit = false;
 
   autoUpdater.on("checking-for-update", () => {
     sendStatus("Verificando atualizações...");
@@ -120,6 +122,28 @@ function setupAutoUpdater() {
 
   autoUpdater.checkForUpdatesAndNotify();
 }
+
+
+autoUpdater.on("update-downloaded", async (info) => {
+  sendStatus(`Update ${info.version} baixado.`);
+
+  const result = await dialog.showMessageBox(mainWindow, {
+    type: "info",
+    title: "Atualização disponível",
+    message: `A versão ${info.version} foi baixada e está pronta para ser instalada.`,
+    detail: "O aplicativo será fechado e a nova versão será instalada. Não desligue o computador durante o processo.",
+    buttons: ["Instalar agora", "Depois"],
+    defaultId: 0,
+    cancelId: 1,
+  });
+
+  if (result.response === 0) {
+    // 👉 Aqui ele FECHA o app e dispara o instalador
+    autoUpdater.quitAndInstall(); 
+  } else {
+    sendStatus("Usuário optou por instalar depois.");
+  }
+});
 
 /**
  * Ciclo de vida do app
