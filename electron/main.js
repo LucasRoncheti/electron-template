@@ -132,13 +132,13 @@ autoUpdater.on("update-downloaded", async (info) => {
     title: "Atualização disponível",
     message: `A versão ${info.version} foi baixada e está pronta para ser instalada.`,
     detail: "O aplicativo será fechado e a nova versão será instalada. Não desligue o computador durante o processo.",
-    buttons: ["Instalar agora", "Depois"],
+    buttons: ["Instalar agora"],
     defaultId: 0,
     cancelId: 1,
   });
 
   if (result.response === 0) {
-    // 👉 Aqui ele FECHA o app e dispara o instalador
+ 
     autoUpdater.quitAndInstall(); 
   } else {
     sendStatus("Usuário optou por instalar depois.");

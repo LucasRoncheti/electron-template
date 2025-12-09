@@ -23,7 +23,7 @@ function App() {
 
   return (
     <div style={{ padding: 30 }}>
-      <h1>App Vite + Electron + Puppeteer</h1>
+      <h1>Gerar pdf site</h1>
 
       <div style={{ marginBottom: 20 }}>
         <strong>Status de update:</strong> {updateStatus}
